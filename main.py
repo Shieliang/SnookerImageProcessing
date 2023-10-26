@@ -3,6 +3,17 @@ import numpy as np
 import tkinter as tk
 from tkinter import filedialog
 
+color_ranges = {
+            'red': ([0, 100, 100], [10, 255, 255]),
+            'blue': ([100, 100, 100], [120, 255, 255]),
+            'black': ([0, 0, 0], [180, 255, 30]),
+            'white': ([0, 0, 180], [180, 30, 255]),  # Adjusted for white ball
+            'green': ([40, 50, 50], [80, 255, 255]),  # Adjusted for green ball
+            'brown': ([10, 100, 100], [30, 255, 255]),
+            'yellow': ([20, 100, 100], [40, 255, 255]),
+            'pink': ([150, 100, 100], [170, 255, 255])
+        }
+
 def upload_video():
     file_path = filedialog.askopenfilename(title="Select a video file", filetypes=[("Video files", "*.mp4;*.avi")])
     if file_path:
