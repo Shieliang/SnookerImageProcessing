@@ -26,14 +26,12 @@ def play_video(video_path):
         grayscale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Apply Gaussian blur
-        blurred_frame = cv2.GaussianBlur(grayscale_frame, (5, 5), 0)
+        blurred_frame = cv2.GaussianBlur(grayscale_frame, (15, 15), 0)
 
         edges = cv2.Canny(blurred_frame, 10, 100)
-        dilated_edges = cv2.dilate(edges, None, iterations=1)
-        frame_with_border = frame.copy()
-        frame_with_border[dilated_edges != 0] = [255, 0, 255]
-
-        cv2.imshow('Snooker Ball', frame_with_border)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(frame, contours, -1, (0, 255, 0), 2)
+        cv2.imshow('Snooker Ball', frame)
 
         key = cv2.waitKey(25)
 
