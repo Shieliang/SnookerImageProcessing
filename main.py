@@ -4,14 +4,7 @@ import tkinter as tk
 from tkinter import filedialog
 
 color_ranges = {
-    'red': ([10, 32, 90], [30, 52, 110]),
-    'blue': ([193, 55, 84], [213, 75, 110]),
-    'black': ([0, 0, 0], [180, 255, 30]),
-    'white': ([170, 35, 85], [195, 54, 110]),
     'green': ([40, 40, 40], [80, 255, 255]),
-    'brown': ([16, 18, 80], [40, 44, 110]),
-    'yellow': ([30, 83, 85], [50, 100, 110]),
-    'pink': ([150, 20, 90], [170, 45, 110])
 }
 
 threshold_area = 500  # Adjust this threshold based on your needs
@@ -62,14 +55,14 @@ def play_video(video_path):
         inverted_table_mask = cv2.bitwise_not(table_mask[:, :, 0])
         inverted_table_mask = cv2.merge([inverted_table_mask, inverted_table_mask, inverted_table_mask])
 
-        # Exclude table contours from the original frame
-        frame_no_table = cv2.bitwise_and(frame, inverted_table_mask)
+        # Apply green color mask to the frame
+        green_mask = apply_color_mask(frame, 'green')
 
-        # Apply color mask to the frame (excluding the table)
-        color_mask = apply_color_mask(frame_no_table, 'green')  # Change 'green' to the desired color
+        # Exclude table contours from the original frame using the green mask
+        frame_no_table = cv2.subtract(frame, green_mask)
 
-        # Display original, modified, and blackened frames side by side
-        side_by_side = np.hstack((frame, color_mask, frame_no_table))
+        # Display original and modified frames side by side
+        side_by_side = np.hstack((frame, frame_no_table))
         cv2.imshow('Comparison', side_by_side)
 
         key = cv2.waitKey(25)
