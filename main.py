@@ -5,13 +5,12 @@ from tkinter import filedialog
 
 
 color_ranges = {
-    'Red': (np.array (0, 128, 78]), np.array ([10, 255, 2551)),
-    'Green': (np.array ([35, 100, 100]), np.array ([85, 255, 255])),
-    'Blue': (np.array([105, 100, 100]), np.array ([135, 255, 255])),
-    'Yellow': (np.array ( [20, 100, 100]), np.array ([30, 255, 255])),
-    'Brown': (np.array ([10, 80, 60]), пр.агг([30, 255, 255])),
-    'Pink': (np.array ( [145, 100, 100]), np.array ([175, 255, 255])),
-    'Black': (np.array([0, 0, 0]), np.array ([180, 255, 30]))
+    'Red': (np.array([0, 128, 78]), np.array([10, 255, 255])),
+    'Blue': (np.array([105, 100, 100]), np.array([135, 255, 255])),
+    'Yellow': (np.array([20, 100, 100]), np.array([30, 255, 255])),
+    'Brown': (np.array([10, 80, 60]), np.array([30, 255, 255])),
+    'Pink': (np.array([145, 100, 100]), np.array([175, 255, 255])),
+    'Black': (np.array([0, 0, 0]), np.array([180, 255, 30]))
 }
 
 def upload_video():
