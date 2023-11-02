@@ -36,6 +36,8 @@ def play_video(video_path):
 
 def detect_balls(frame):
     gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
     circles = cv2.HoughCircles(
         gray_frame, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=50, param2=30, minRadius=10, maxRadius=35
     )
@@ -44,8 +46,34 @@ def detect_balls(frame):
         circles = np.uint16(np.around(circles))
         for circle in circles[0, :]:
             x, y, radius = circle
-            cv2.circle(frame, (x, y), radius, (0, 255, 0), 2)  # Draw the circle
-            cv2.circle(frame, (x, y), 2, (0, 0, 255), 3)  # Draw the center
+
+            # Crop a region of interest (ROI) around the detected ball
+            roi = hsv_frame[y - radius:y + radius, x - radius:x + radius]
+
+            # Calculate the brightness (value) of the ROI
+            brightness = np.mean(roi[:, :, 2])
+
+            # Desaturate the ball pixels by setting the saturation channel to a constant value
+            saturation = 30  # Adjust the saturation value as needed
+            roi[:, :, 1] = saturation
+
+            # Calculate the number of white pixels (with value > brightness) and total pixels within the ball area
+            white_pixels = np.sum(roi[:, :, 2] > brightness)
+            total_pixels = roi.shape[0] * roi.shape[1]
+
+            # Calculate the proportion of white pixels
+            proportion_white = white_pixels / total_pixels
+
+            # Threshold on counts: classify as striped if proportion is greater than threshold q
+            q = 0.5  # Adjust the threshold as needed
+            ball_type = "Striped" if proportion_white > q else "Solid"
+
+            # Draw the circle with a label indicating the ball type
+            cv2.circle(frame, (x, y), radius, (0, 255, 0), 2)
+            cv2.circle(frame, (x, y), 2, (0, 0, 255), 3)
+            cv2.putText(frame, ball_type, (x - 2 * radius, y - 2 * radius), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+
 
 # Create the main window
 root = tk.Tk()
@@ -57,3 +85,4 @@ upload_button.pack(pady=20)
 
 # Run the GUI
 root.mainloop()
+
