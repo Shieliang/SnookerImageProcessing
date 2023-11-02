@@ -49,7 +49,7 @@ def detect_balls(frame):
     hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     circles = cv2.HoughCircles(
-        gray_frame, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=50, param2=30, minRadius=10, maxRadius=35
+        gray_frame, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=95, param2=23, minRadius=9, maxRadius=35
     )
 
     if circles is not None:
