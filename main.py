@@ -3,67 +3,28 @@ import numpy as np
 import tkinter as tk
 from tkinter import filedialog
 
-color_ranges = {
-    'green': ([40, 40, 40], [80, 255, 255]),
-}
-
-threshold_area = 500  # Adjust this threshold based on your needs
-
 def upload_video():
     file_path = filedialog.askopenfilename(title="Select a video file", filetypes=[("Video files", "*.mp4;*.avi")])
     if file_path:
         play_video(file_path)
-
-def apply_color_mask(frame, color):
-    hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    lower_range, upper_range = color_ranges[color]
-    mask = cv2.inRange(hsv_frame, np.array(lower_range), np.array(upper_range))
-    result = cv2.bitwise_and(frame, frame, mask=mask)
-    return result
 
 def play_video(video_path):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print("Error opening video file")
 
-    # Create a window with fixed size
-    cv2.namedWindow('Comparison', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('Comparison', 1500, 600)
+    # Create a window with a fixed size
+    cv2.namedWindow('Snooker Ball', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('Snooker Ball', 1000, 600)
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Convert the frame to grayscale
-        grayscale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        detect_balls(frame)  # Detect snooker balls using Hough Circle Transform
 
-        # Apply Gaussian blur
-        blurred_frame = cv2.GaussianBlur(grayscale_frame, (15, 15), 0)
-
-        edges = cv2.Canny(blurred_frame, 10, 100)
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Filter contours based on area
-        filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > threshold_area]
-
-        # Create a mask for the table contours
-        table_mask = np.zeros_like(frame)
-        cv2.drawContours(table_mask, filtered_contours, -1, (255, 255, 255), thickness=cv2.FILLED)
-
-        # Invert the table mask
-        inverted_table_mask = cv2.bitwise_not(table_mask[:, :, 0])
-        inverted_table_mask = cv2.merge([inverted_table_mask, inverted_table_mask, inverted_table_mask])
-
-        # Apply green color mask to the frame
-        green_mask = apply_color_mask(frame, 'green')
-
-        # Exclude table contours from the original frame using the green mask
-        frame_no_table = cv2.subtract(frame, green_mask)
-
-        # Display original and modified frames side by side
-        side_by_side = np.hstack((frame, frame_no_table))
-        cv2.imshow('Comparison', side_by_side)
+        cv2.imshow('Snooker Ball', frame)
 
         key = cv2.waitKey(25)
 
@@ -72,6 +33,19 @@ def play_video(video_path):
 
     cap.release()
     cv2.destroyAllWindows()
+
+def detect_balls(frame):
+    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    circles = cv2.HoughCircles(
+        gray_frame, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=50, param2=30, minRadius=10, maxRadius=35
+    )
+
+    if circles is not None:
+        circles = np.uint16(np.around(circles))
+        for circle in circles[0, :]:
+            x, y, radius = circle
+            cv2.circle(frame, (x, y), radius, (0, 255, 0), 2)  # Draw the circle
+            cv2.circle(frame, (x, y), 2, (0, 0, 255), 3)  # Draw the center
 
 # Create the main window
 root = tk.Tk()
