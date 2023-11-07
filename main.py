@@ -32,9 +32,9 @@ def play_video(video_path):
         if not ret:
             break
 
-        detect_balls(frame)  # Detect snooker balls using Hough Circle Transform
+        proccessed_frame = find_balls(frame)  # Detect snooker balls using Hough Circle Transform
 
-        cv2.imshow('Snooker Ball', frame)
+        cv2.imshow('Snooker Ball', proccessed_frame)
 
         key = cv2.waitKey(25)
 
@@ -44,46 +44,99 @@ def play_video(video_path):
     cap.release()
     cv2.destroyAllWindows()
 
-def detect_balls(frame):
-    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+def find_balls(frame):
+    transformed_blur = cv2.GaussianBlur(frame, (5, 5), 2)  # blur applied
+    blur_RGB = cv2.cvtColor(transformed_blur, cv2.COLOR_BGR2RGB)  # rgb version
 
-    circles = cv2.HoughCircles(
-        gray_frame, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=95, param2=23, minRadius=9, maxRadius=35
-    )
+    # hsv colors of the snooker table
+    lower = np.array([50, 120, 30])
+    upper = np.array([70, 255, 255])
 
-    if circles is not None:
-        circles = np.uint16(np.around(circles))
-        for circle in circles[0, :]:
-            x, y, radius = circle
+    hsv = cv2.cvtColor(blur_RGB, cv2.COLOR_RGB2HSV)  # convert to hsv
+    mask = cv2.inRange(hsv, lower, upper)  # table's mask
 
-            # Crop a region of interest (ROI) around the detected ball
-            roi = hsv_frame[y - radius:y + radius, x - radius:x + radius]
+    # apply closing
+    kernel = np.ones((5, 5), np.uint8)
+    mask_closing = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)  # dilate->erode
 
-            # Calculate the brightness (value) of the ROI
-            brightness = np.mean(roi[:, :, 2])
+    # invert mask to focus on objects on table
+    _, mask_inv = cv2.threshold(mask_closing, 5, 255, cv2.THRESH_BINARY_INV)  # mask inv
 
-            # Desaturate the ball pixels by setting the saturation channel to a constant value
-            saturation = 30  # Adjust the saturation value as needed
-            roi[:, :, 1] = saturation
+    masked_img = cv2.bitwise_and(frame,frame,mask=mask_inv)
 
-            # Calculate the number of white pixels (with value > brightness) and total pixels within the ball area
-            white_pixels = np.sum(roi[:, :, 2] > brightness)
-            total_pixels = roi.shape[0] * roi.shape[1]
-
-            # Calculate the proportion of white pixels
-            proportion_white = white_pixels / total_pixels
-
-            # Threshold on counts: classify as striped if proportion is greater than threshold q
-            q = 0.5  # Adjust the threshold as needed
-            ball_type = "Striped" if proportion_white > q else "Solid"
-
-            # Draw the circle with a label indicating the ball type
-            cv2.circle(frame, (x, y), radius, (0, 255, 0), 2)
-            cv2.circle(frame, (x, y), 2, (0, 0, 255), 3)
-            cv2.putText(frame, ball_type, (x - 2 * radius, y - 2 * radius), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    ctrs, hierarchy = cv2.findContours(mask_inv, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # find contours
+    detected_objects = draw_rectangles(ctrs, masked_img)
+    ctrs_filtered = filter_ctrs(ctrs)
+    detected_objects_filtered = draw_rectangles(ctrs_filtered, masked_img)
+    ctrs_color = find_ctrs_color(ctrs_filtered, masked_img)
+    ctrs_color = cv2.addWeighted(ctrs_color, 0.5, masked_img, 0.5, 0)  # contours color image + transformed image
+    return detected_objects_filtered
 
 
+def draw_rectangles(ctrs, img):
+    output = img.copy()
+
+    for i in range(len(ctrs)):
+        M = cv2.moments(ctrs[i])  # moments
+        rot_rect = cv2.minAreaRect(ctrs[i])
+        w = rot_rect[1][0]  # width
+        h = rot_rect[1][1]  # height
+
+        box = np.int64(cv2.boxPoints(rot_rect))
+        cv2.drawContours(output, [box], 0, (255, 100, 0), 2)  # draws box
+
+    return output
+
+def filter_ctrs(ctrs, min_s=300, max_s=15000, alpha=2):
+    filtered_ctrs = []  # list for filtered contours
+
+    for x in range(len(ctrs)):  # for all contours
+
+        rot_rect = cv2.minAreaRect(ctrs[x])  # area of rectangle around contour
+        w = rot_rect[1][0]  # width of rectangle
+        h = rot_rect[1][1]  # height
+        area = cv2.contourArea(ctrs[x])  # contour area
+
+        # Adjusted parameters for better detection
+        if (h * alpha < w) or (w * alpha < h):  # if the contour isn't the size of a snooker ball
+            continue  # do nothing
+
+        if (area < min_s) or (area > max_s):  # if the contour area is too big/small
+            continue  # do nothing
+
+        # if it passed the previous statements, then it is most likely a ball
+        filtered_ctrs.append(ctrs[x])  # add contour to filtered contours list
+
+    return filtered_ctrs  # returns filtered contours
+
+
+def find_ctrs_color(ctrs, input_img):
+    K = np.ones((3, 3), np.uint8)  # filter
+    output = input_img.copy()  # np.zeros(input_img.shape,np.uint8) # empty img
+    gray = cv2.cvtColor(input_img, cv2.COLOR_BGR2GRAY)  # gray version
+    mask = np.zeros(gray.shape, np.uint8)  # empty mask
+
+    for i in range(len(ctrs)):  # for all contours
+
+        # find center of contour
+        M = cv2.moments(ctrs[i])
+        cX = int(M['m10'] / M['m00'])  # X pos of contour center
+        cY = int(M['m01'] / M['m00'])  # Y pos
+
+        mask[...] = 0  # reset the mask for every ball
+
+        cv2.drawContours(mask, ctrs, i, 255,
+                         -1)  # draws the mask of current contour (every ball is getting masked each iteration)
+
+        mask = cv2.erode(mask, K, iterations=3)  # erode mask to filter green color around the balls contours
+
+        output = cv2.circle(output,  # img to draw on
+                            (cX, cY),  # position on img
+                            20,  # radius of circle - size of drawn snooker ball
+                            cv2.mean(input_img, mask),
+                            # color mean of each contour-color of each ball (src_img=transformed img)
+                            -1)  # -1 to fill ball with color
+    return output
 
 # Create the main window
 root = tk.Tk()
