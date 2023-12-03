@@ -3,16 +3,6 @@ import numpy as np
 import tkinter as tk
 from tkinter import filedialog
 
-
-color_ranges = {
-    'Red': (np.array([0, 128, 78]), np.array([10, 255, 255])),
-    'Blue': (np.array([105, 100, 100]), np.array([135, 255, 255])),
-    'Yellow': (np.array([20, 100, 100]), np.array([30, 255, 255])),
-    'Brown': (np.array([10, 80, 60]), np.array([30, 255, 255])),
-    'Pink': (np.array([145, 100, 100]), np.array([175, 255, 255])),
-    'Black': (np.array([0, 0, 0]), np.array([180, 255, 30]))
-}
-
 def upload_video():
     file_path = filedialog.askopenfilename(title="Select a video file", filetypes=[("Video files", "*.mp4;*.avi")])
     if file_path:
@@ -36,7 +26,7 @@ def play_video(video_path):
 
         cv2.imshow('Snooker Ball', proccessed_frame)
 
-        key = cv2.waitKey(25)
+        key = cv2.waitKey(16)
 
         if key == ord('q') or key == 27:
             break
@@ -45,49 +35,59 @@ def play_video(video_path):
     cv2.destroyAllWindows()
 
 def find_balls(frame):
+    ctrs_threshold_frame = []
+    ctrs_filtered_list = []
+
     transformed_blur = cv2.GaussianBlur(frame, (5, 5), 2)  # blur applied
-    blur_RGB = cv2.cvtColor(transformed_blur, cv2.COLOR_BGR2RGB)  # rgb version
+    HSV_frame = cv2.cvtColor(transformed_blur, cv2.COLOR_BGR2HSV)  # rgb version
+    gray_frame = cv2.cvtColor(transformed_blur, cv2.COLOR_BGR2GRAY)  # Convert to grayscale
+    _, threshold_frame = cv2.threshold(gray_frame, 130, 255, cv2.THRESH_BINARY)  # Thresholding
+
+    # Additional processing for contour separation
+    threshold_frame = cv2.erode(threshold_frame, None, iterations=1)
+    threshold_frame = cv2.dilate(threshold_frame, None, iterations=7)
 
     # hsv colors of the snooker table
     lower = np.array([50, 120, 30])
     upper = np.array([70, 255, 255])
 
-    hsv = cv2.cvtColor(blur_RGB, cv2.COLOR_RGB2HSV)  # convert to hsv
-    mask = cv2.inRange(hsv, lower, upper)  # table's mask
+    ctrs, hierarchy = cv2.findContours(threshold_frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours_drawn = frame.copy()
+    for i, contour in enumerate(ctrs):
+        #cv2.drawContours(contours_drawn, [contour], -1, (0, 255, 0), 2)  # -1 indicates drawing all contours
+        # Get the coordinates of the bounding rectangle of the contour
+        x, y, w, h = cv2.boundingRect(contour)
+        ctrs_threshold_frame.append((x, y, w, h))
 
-    # apply closing
-    kernel = np.ones((5, 5), np.uint8)
+    mask = cv2.inRange(HSV_frame, lower, upper)  # table's mask
+    kernel = np.ones((10, 10), np.uint8)
     mask_closing = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)  # dilate->erode
+    _, mask_inv = cv2.threshold(mask_closing, 5, 255, cv2.THRESH_BINARY_INV)  # mask inv
+    mask_inv = cv2.erode(mask_inv, None, iterations=1)
+    mask_inv = cv2.dilate(mask_inv, None, iterations=10)
 
     # invert mask to focus on objects on table
-    _, mask_inv = cv2.threshold(mask_closing, 5, 255, cv2.THRESH_BINARY_INV)  # mask inv
-
-    masked_img = cv2.bitwise_and(frame,frame,mask=mask_inv)
-
     ctrs, hierarchy = cv2.findContours(mask_inv, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # find contours
-    detected_objects = draw_rectangles(ctrs, masked_img)
     ctrs_filtered = filter_ctrs(ctrs)
-    detected_objects_filtered = draw_rectangles(ctrs_filtered, masked_img)
-    ctrs_color = find_ctrs_color(ctrs_filtered, masked_img)
-    ctrs_color = cv2.addWeighted(ctrs_color, 0.5, masked_img, 0.5, 0)  # contours color image + transformed image
-    return detected_objects_filtered
+    ctrs_filtered_list.append(ctrs_filtered)
+
+    for coord in ctrs_threshold_frame:
+        for c in ctrs_filtered:
+            if is_point_inside_contour(coord, cv2.boundingRect(c)):
+                x, y, w, h = coord
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
+
+    return frame
 
 
-def draw_rectangles(ctrs, img):
-    output = img.copy()
+def is_point_inside_contour(point, contour_rect):
+    x, y, w, h = contour_rect
+    x_center = x + w // 2
+    y_center = y + h // 2
+    return x <= point[0] <= x + w and y <= point[1] <= y + h
 
-    for i in range(len(ctrs)):
-        M = cv2.moments(ctrs[i])  # moments
-        rot_rect = cv2.minAreaRect(ctrs[i])
-        w = rot_rect[1][0]  # width
-        h = rot_rect[1][1]  # height
 
-        box = np.int64(cv2.boxPoints(rot_rect))
-        cv2.drawContours(output, [box], 0, (255, 100, 0), 2)  # draws box
-
-    return output
-
-def filter_ctrs(ctrs, min_s=300, max_s=15000, alpha=2):
+def filter_ctrs(ctrs, min_s=300, max_s=20000, alpha=2):
     filtered_ctrs = []  # list for filtered contours
 
     for x in range(len(ctrs)):  # for all contours
@@ -109,34 +109,6 @@ def filter_ctrs(ctrs, min_s=300, max_s=15000, alpha=2):
 
     return filtered_ctrs  # returns filtered contours
 
-
-def find_ctrs_color(ctrs, input_img):
-    K = np.ones((3, 3), np.uint8)  # filter
-    output = input_img.copy()  # np.zeros(input_img.shape,np.uint8) # empty img
-    gray = cv2.cvtColor(input_img, cv2.COLOR_BGR2GRAY)  # gray version
-    mask = np.zeros(gray.shape, np.uint8)  # empty mask
-
-    for i in range(len(ctrs)):  # for all contours
-
-        # find center of contour
-        M = cv2.moments(ctrs[i])
-        cX = int(M['m10'] / M['m00'])  # X pos of contour center
-        cY = int(M['m01'] / M['m00'])  # Y pos
-
-        mask[...] = 0  # reset the mask for every ball
-
-        cv2.drawContours(mask, ctrs, i, 255,
-                         -1)  # draws the mask of current contour (every ball is getting masked each iteration)
-
-        mask = cv2.erode(mask, K, iterations=3)  # erode mask to filter green color around the balls contours
-
-        output = cv2.circle(output,  # img to draw on
-                            (cX, cY),  # position on img
-                            20,  # radius of circle - size of drawn snooker ball
-                            cv2.mean(input_img, mask),
-                            # color mean of each contour-color of each ball (src_img=transformed img)
-                            -1)  # -1 to fill ball with color
-    return output
 
 # Create the main window
 root = tk.Tk()
