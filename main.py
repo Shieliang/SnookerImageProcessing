@@ -3,6 +3,16 @@ import numpy as np
 import tkinter as tk
 from tkinter import filedialog
 
+color_masks = [
+        {"name": "Red", "lower": np.array([0, 0, 140]), "upper": np.array([20, 255, 255])},
+        {"name": "Blue", "lower": np.array([100, 0, 0]), "upper": np.array([140, 255, 255])},
+        {"name": "Green", "lower": np.array([50, 100, 0]), "upper": np.array([85, 255, 255])},
+        {"name": "Yellow", "lower": np.array([20, 0, 0]), "upper": np.array([40, 255, 255])},
+        #{"name": "Pink", "lower": np.array([200, 0, 0]), "upper": np.array([250, 255, 255])},
+        #{"name": "Black", "lower": np.array([0, 0, 0]), "upper": np.array([0, 255, 255])},
+        #{"name": "White", "lower": np.array([0, 0, 200]), "upper": np.array([180, 30, 255])},
+        {"name": "Brown", "lower": np.array([10, 60, 60]), "upper": np.array([20, 255, 255])},
+    ]
 def upload_video():
     file_path = filedialog.askopenfilename(title="Select a video file", filetypes=[("Video files", "*.mp4;*.avi")])
     if file_path:
@@ -26,7 +36,7 @@ def play_video(video_path):
 
         cv2.imshow('Snooker Ball', proccessed_frame)
 
-        key = cv2.waitKey(16)
+        key = cv2.waitKey(5)
 
         if key == ord('q') or key == 27:
             break
@@ -37,6 +47,7 @@ def play_video(video_path):
 def find_balls(frame):
     ctrs_threshold_frame = []
     ctrs_filtered_list = []
+    detected_ball_list = []
 
     transformed_blur = cv2.GaussianBlur(frame, (5, 5), 2)  # blur applied
     HSV_frame = cv2.cvtColor(transformed_blur, cv2.COLOR_BGR2HSV)  # rgb version
@@ -76,9 +87,33 @@ def find_balls(frame):
             if is_point_inside_contour(coord, cv2.boundingRect(c)):
                 x, y, w, h = coord
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
+                ball_color = determine_ball_color(frame[y:y + h, x:x + w])
+                detected_ball_list.append(coord)
+                cv2.putText(frame, ball_color, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2,
+                            cv2.LINE_AA)
 
     return frame
 
+def determine_ball_color(ball_roi):
+    # Convert the ball region to HSV
+    hsv_ball = cv2.cvtColor(ball_roi, cv2.COLOR_BGR2HSV)
+
+    # Iterate through color masks to find the best match
+    best_match_color = "Unknown"
+    max_match_count = 0
+
+    for color_mask in color_masks:
+        lower = color_mask["lower"]
+        upper = color_mask["upper"]
+
+        mask = cv2.inRange(hsv_ball, lower, upper)
+        match_count = cv2.countNonZero(mask)
+
+        if match_count > max_match_count:
+            max_match_count = match_count
+            best_match_color = color_mask["name"]
+
+    return best_match_color
 
 def is_point_inside_contour(point, contour_rect):
     x, y, w, h = contour_rect
