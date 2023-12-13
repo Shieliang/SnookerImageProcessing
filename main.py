@@ -1,18 +1,19 @@
 import cv2
+import cv2
 import numpy as np
 import tkinter as tk
 from tkinter import filedialog
 
 color_masks = [
-        {"name": "Red", "lower": np.array([0, 0, 140]), "upper": np.array([20, 255, 255])},
-        {"name": "Blue", "lower": np.array([100, 0, 0]), "upper": np.array([140, 255, 255])},
-        {"name": "Green", "lower": np.array([50, 100, 0]), "upper": np.array([85, 255, 255])},
-        {"name": "Yellow", "lower": np.array([20, 0, 0]), "upper": np.array([40, 255, 255])},
-        #{"name": "Pink", "lower": np.array([200, 0, 0]), "upper": np.array([250, 255, 255])},
-        #{"name": "Black", "lower": np.array([0, 0, 0]), "upper": np.array([0, 255, 255])},
-        #{"name": "White", "lower": np.array([0, 0, 200]), "upper": np.array([180, 30, 255])},
-        {"name": "Brown", "lower": np.array([10, 60, 60]), "upper": np.array([20, 255, 255])},
-    ]
+    {"name": "Red", "lower": np.array([0, 0, 140]), "upper": np.array([20, 255, 255])},
+    {"name": "Blue", "lower": np.array([100, 155, 100]), "upper": np.array([140, 255, 255])},
+    {"name": "Green", "lower": np.array([70, 200, 100]), "upper": np.array([85, 255, 255])},
+    {"name": "Yellow", "lower": np.array([40, 150, 0]), "upper": np.array([60, 255, 255])},
+    {"name": "Pink", "lower": np.array([170, 50, 150]), "upper": np.array([255, 255, 255])},
+    {"name": "Black", "lower": np.array([0, 0, 0]), "upper": np.array([255, 255, 30])},
+    {"name": "White", "lower": np.array([0, 50, 150]), "upper": np.array([100, 100, 255])},
+    {"name": "Brown", "lower": np.array([10, 60, 60]), "upper": np.array([20, 255, 255])},
+]
 def upload_video():
     file_path = filedialog.askopenfilename(title="Select a video file", filetypes=[("Video files", "*.mp4;*.avi")])
     if file_path:
@@ -155,4 +156,5 @@ upload_button.pack(pady=20)
 
 # Run the GUI
 root.mainloop()
+
 
