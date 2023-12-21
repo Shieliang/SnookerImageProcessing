@@ -1,8 +1,17 @@
 import cv2
-import cv2
 import numpy as np
 import tkinter as tk
 from tkinter import filedialog
+
+# Add these global variables at the beginning of your code
+red_score = 0
+blue_score = 0
+green_score = 0
+yellow_score = 0
+pink_score = 0
+black_score = 0
+white_score = 0
+brown_score = 0
 
 color_masks = [
     {"name": "Red", "lower": np.array([0, 0, 140]), "upper": np.array([20, 255, 255])},
@@ -156,5 +165,7 @@ upload_button.pack(pady=20)
 
 # Run the GUI
 root.mainloop()
+
+
 
 
