@@ -4,14 +4,36 @@ import tkinter as tk
 from tkinter import filedialog
 
 # Add these global variables at the beginning of your code
-red_score = 0
-blue_score = 0
-green_score = 0
-yellow_score = 0
-pink_score = 0
-black_score = 0
-white_score = 0
-brown_score = 0
+color_scoring = {
+    "Red": 1,
+    "Blue": 5,
+    "Green": 3,
+    "Yellow": 2,
+    "Pink": 6,
+    "Black": 7,
+    "White": 0,
+    "Brown": 4,
+}
+
+hole_pockets = {
+    "LeftTop": (50, 50),
+    "MiddleTop": (500, 50),
+    "RightTop": (950, 50),
+    "RightBottom": (950, 550),
+    "MiddleBottom": (500, 550),
+    "LeftBottom": (50, 550),
+}
+
+
+player1_score = 0
+player2_score = 0
+
+detected_ball_list = []
+def update_player_scores(ball_color):
+    global player1_score, player2_score
+
+    if ball_color in color_scoring:
+        player1_score += color_scoring[ball_color]
 
 color_masks = [
     {"name": "Red", "lower": np.array([0, 0, 140]), "upper": np.array([20, 255, 255])},
@@ -24,14 +46,16 @@ color_masks = [
     {"name": "Brown", "lower": np.array([10, 60, 60]), "upper": np.array([20, 255, 255])},
 ]
 def upload_video():
-    file_path = filedialog.askopenfilename(title="Select a video file", filetypes=[("Video files", "*.mp4;*.avi")])
-    if file_path:
-        play_video(file_path)
+    global video_path
+    video_path = filedialog.askopenfilename(title="Select a video file", filetypes=[("Video files", ".mp4;.avi")])
+    if video_path:
+        play_button.config(state=tk.NORMAL)
 
-def play_video(video_path):
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print("Error opening video file")
+def play_video():
+    if video_path:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            print("Error opening video file")
 
     # Create a window with a fixed size
     cv2.namedWindow('Snooker Ball', cv2.WINDOW_NORMAL)
@@ -57,7 +81,7 @@ def play_video(video_path):
 def find_balls(frame):
     ctrs_threshold_frame = []
     ctrs_filtered_list = []
-    detected_ball_list = []
+
 
     transformed_blur = cv2.GaussianBlur(frame, (5, 5), 2)  # blur applied
     HSV_frame = cv2.cvtColor(transformed_blur, cv2.COLOR_BGR2HSV)  # rgb version
@@ -156,16 +180,45 @@ def filter_ctrs(ctrs, min_s=300, max_s=20000, alpha=2):
 
 
 # Create the main window
+# Create the main window
 root = tk.Tk()
 root.title("Snooker Ball")
 
+# Set up the background image
+background_image_path =  "1200px-Snooker_Table_Start_Positions.png" # Replace with the path to your image
+background_image = tk.PhotoImage(file=background_image_path)
+
+# Get the screen width and height
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+
+# Calculate the center coordinates
+x = (screen_width - 1000) // 2
+y = (screen_height - 600) // 2
+
+# Set the window size and position
+root.geometry(f"1000x600+{x}+{y}")
+
+# Create a larger label for the background image
+background_label = tk.Label(root, image=background_image)
+background_label.place(relwidth=1, relheight=1)
+
+# Set up button style
+button_style = ("Helvetica", 14)
+button_bg_color = "lightblue"
+
 # Create an "Upload Video" button
-upload_button = tk.Button(root, text="Upload Video", command=upload_video)
-upload_button.pack(pady=20)
+upload_button = tk.Button(root, text="Upload Video", command=upload_video, font=button_style, bg=button_bg_color,
+                          highlightthickness=0, bd=0)
+upload_button.place(relx=0.5, rely=0.5, anchor="center")
+
+# Create a "Play Video" button
+play_button = tk.Button(root, text="Play Video", command=play_video, bg="lightgreen", font=button_style,
+                        highlightthickness=0, bd=0)
+play_button.place(relx=0.5, rely=0.6, anchor="center")
 
 # Run the GUI
 root.mainloop()
-
 
 
 
