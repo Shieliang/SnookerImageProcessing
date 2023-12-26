@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import tkinter as tk
 from tkinter import filedialog
+import time
 
 # Add these global variables at the beginning of your code
 color_scoring = {
@@ -15,34 +16,32 @@ color_scoring = {
     "Brown": 4,
 }
 
-hole_pockets = {
-    "LeftTop": (50, 50),
-    "MiddleTop": (500, 50),
-    "RightTop": (950, 50),
-    "RightBottom": (950, 550),
-    "MiddleBottom": (500, 550),
-    "LeftBottom": (50, 550),
-}
-
-
-player1_score = 0
-player2_score = 0
-
+last_seen_time = {}
 detected_ball_list = []
+
+player_score = 0
+
 def update_player_scores(ball_color):
-    global player1_score, player2_score
+    global player_score
+    global last_seen_time
 
     if ball_color in color_scoring:
-        player1_score += color_scoring[ball_color]
+        current_time = time.time()
+
+        # Check if 1 second has passed since the last detection
+        if ball_color not in last_seen_time or (current_time - last_seen_time[ball_color]) > 1:
+            player_score += color_scoring[ball_color]
+            last_seen_time[ball_color] = current_time
+
 
 color_masks = [
     {"name": "Red", "lower": np.array([0, 0, 140]), "upper": np.array([20, 255, 255])},
     {"name": "Blue", "lower": np.array([100, 155, 100]), "upper": np.array([140, 255, 255])},
-    {"name": "Green", "lower": np.array([70, 200, 100]), "upper": np.array([85, 255, 255])},
+    {"name": "Green", "lower": np.array([80, 120, 100]), "upper": np.array([85, 200, 150])},
     {"name": "Yellow", "lower": np.array([40, 150, 0]), "upper": np.array([60, 255, 255])},
-    {"name": "Pink", "lower": np.array([170, 50, 150]), "upper": np.array([255, 255, 255])},
+    {"name": "Pink", "lower": np.array([170, 50, 150]), "upper": np.array([255, 100, 255])},
     {"name": "Black", "lower": np.array([0, 0, 0]), "upper": np.array([255, 255, 30])},
-    {"name": "White", "lower": np.array([0, 50, 150]), "upper": np.array([100, 100, 255])},
+    {"name": "White", "lower": np.array([0, 0, 150]), "upper": np.array([100, 90, 255])},
     {"name": "Brown", "lower": np.array([10, 60, 60]), "upper": np.array([20, 255, 255])},
 ]
 def upload_video():
@@ -66,9 +65,12 @@ def play_video():
         if not ret:
             break
 
-        proccessed_frame = find_balls(frame)  # Detect snooker balls using Hough Circle Transform
+        processedframe = find_balls(frame)  # Detect snooker balls using Hough Circle Transform
+        draw_pocket_rectangles(processedframe)
 
-        cv2.imshow('Snooker Ball', proccessed_frame)
+        cv2.putText(processedframe, f"Player Score: {player_score}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                    (255, 255, 255), 2, cv2.LINE_AA)
+        cv2.imshow('Snooker Ball', processedframe)
 
         key = cv2.waitKey(5)
 
@@ -81,6 +83,8 @@ def play_video():
 def find_balls(frame):
     ctrs_threshold_frame = []
     ctrs_filtered_list = []
+    global last_seen_time
+    current_time = time.time()
 
 
     transformed_blur = cv2.GaussianBlur(frame, (5, 5), 2)  # blur applied
@@ -90,26 +94,28 @@ def find_balls(frame):
 
     # Additional processing for contour separation
     threshold_frame = cv2.erode(threshold_frame, None, iterations=1)
-    threshold_frame = cv2.dilate(threshold_frame, None, iterations=7)
-
-    # hsv colors of the snooker table
-    lower = np.array([50, 120, 30])
-    upper = np.array([70, 255, 255])
+    threshold_frame = cv2.dilate(threshold_frame, None, iterations=6)
 
     ctrs, hierarchy = cv2.findContours(threshold_frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    contours_drawn = frame.copy()
     for i, contour in enumerate(ctrs):
-        #cv2.drawContours(contours_drawn, [contour], -1, (0, 255, 0), 2)  # -1 indicates drawing all contours
         # Get the coordinates of the bounding rectangle of the contour
         x, y, w, h = cv2.boundingRect(contour)
         ctrs_threshold_frame.append((x, y, w, h))
 
-    mask = cv2.inRange(HSV_frame, lower, upper)  # table's mask
-    kernel = np.ones((10, 10), np.uint8)
+        # hsv colors of the snooker table
+    lower = np.array([50, 120, 30])
+    upper = np.array([70, 255, 255])
+    light_blue_lower = np.array([90, 50, 140])
+    light_blue_upper = np.array([102, 255, 215])
+
+    green_mask = cv2.inRange(HSV_frame, lower, upper)  # table's mask
+    ligh_blue_mask = cv2.inRange(HSV_frame,light_blue_lower,light_blue_upper)
+    mask = cv2.bitwise_or(green_mask,ligh_blue_mask)
+    kernel = np.ones((15, 15), np.uint8)
     mask_closing = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)  # dilate->erode
     _, mask_inv = cv2.threshold(mask_closing, 5, 255, cv2.THRESH_BINARY_INV)  # mask inv
     mask_inv = cv2.erode(mask_inv, None, iterations=1)
-    mask_inv = cv2.dilate(mask_inv, None, iterations=10)
+    mask_inv = cv2.dilate(mask_inv, None, iterations=9)
 
     # invert mask to focus on objects on table
     ctrs, hierarchy = cv2.findContours(mask_inv, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # find contours
@@ -125,8 +131,36 @@ def find_balls(frame):
                 detected_ball_list.append(coord)
                 cv2.putText(frame, ball_color, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2,
                             cv2.LINE_AA)
+                for pocket, (pocket_x, pocket_y) in hole_pockets.items():
+                    hole_rect = (pocket_x - 2, pocket_y - 2, 54, 54)
+
+                    # Check if the ball touches the border of the hole
+                    if is_point_on_border_of_hole((x + w // 2, y + h // 2), hole_rect):
+                        update_player_scores(ball_color)
+                    else:
+                        continue
 
     return frame
+
+def is_point_on_border_of_hole(point, hole_rect, buffer=5):
+    x, y, w, h = hole_rect
+
+    # Check if the point is on the border of the hole within the specified buffer
+    return (
+        (x - buffer) <= point[0] <= (x + w + buffer) and
+        (y - buffer) <= point[1] <= (y + h + buffer) and
+        (
+            abs(point[0] - x) < buffer or
+            abs(point[0] - (x + w)) < buffer or
+            abs(point[1] - y) < buffer or
+            abs(point[1] - (y + h)) < buffer
+        )
+    )
+def draw_pocket_rectangles(frame):
+    for pocket, (x, y) in hole_pockets.items():
+        square_size = 2  # Adjust the size of the square as needed
+        cv2.rectangle(frame, (x - square_size, y - square_size), (x + 50 + square_size, y + 50 + square_size),
+                      (0, 255, 255), 2)
 
 def determine_ball_color(ball_roi):
     # Convert the ball region to HSV
@@ -156,7 +190,7 @@ def is_point_inside_contour(point, contour_rect):
     return x <= point[0] <= x + w and y <= point[1] <= y + h
 
 
-def filter_ctrs(ctrs, min_s=300, max_s=20000, alpha=2):
+def filter_ctrs(ctrs, min_s=700, max_s=17000, alpha=2):
     filtered_ctrs = []  # list for filtered contours
 
     for x in range(len(ctrs)):  # for all contours
@@ -179,7 +213,7 @@ def filter_ctrs(ctrs, min_s=300, max_s=20000, alpha=2):
     return filtered_ctrs  # returns filtered contours
 
 
-# Create the main window
+
 # Create the main window
 root = tk.Tk()
 root.title("Snooker Ball")
@@ -191,6 +225,15 @@ background_image = tk.PhotoImage(file=background_image_path)
 # Get the screen width and height
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
+
+hole_pockets = {
+    "LeftTop": (int(screen_width - screen_width), int(screen_height - screen_height + 40)),
+    "MiddleTop": (int((screen_width / 2) - 20), int(screen_height - screen_height)+20),
+    "RightTop": (int(screen_width - 40), int(screen_height - screen_height + 30)),
+    "RightBottom": (int(screen_width - screen_width - 10), int(screen_height-80)),
+    "MiddleBottom": (int((screen_width / 2) - 20), int(screen_height-60)),
+    "LeftBottom": (int(screen_width-30), int(screen_height-80)),
+}
 
 # Calculate the center coordinates
 x = (screen_width - 1000) // 2
@@ -217,8 +260,7 @@ play_button = tk.Button(root, text="Play Video", command=play_video, bg="lightgr
                         highlightthickness=0, bd=0)
 play_button.place(relx=0.5, rely=0.6, anchor="center")
 
+
+
 # Run the GUI
 root.mainloop()
-
-
-
