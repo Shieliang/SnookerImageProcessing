@@ -32,6 +32,7 @@ def update_player_scores(ball_color):
         if ball_color not in last_seen_time or (current_time - last_seen_time[ball_color]) > 1:
             player_score += color_scoring[ball_color]
             last_seen_time[ball_color] = current_time
+            print(player_score,ball_color)
 
 
 color_masks = [
@@ -94,7 +95,7 @@ def find_balls(frame):
 
     # Additional processing for contour separation
     threshold_frame = cv2.erode(threshold_frame, None, iterations=1)
-    threshold_frame = cv2.dilate(threshold_frame, None, iterations=6)
+    threshold_frame = cv2.dilate(threshold_frame, None, iterations=7)
 
     ctrs, hierarchy = cv2.findContours(threshold_frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     for i, contour in enumerate(ctrs):
@@ -115,7 +116,7 @@ def find_balls(frame):
     mask_closing = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)  # dilate->erode
     _, mask_inv = cv2.threshold(mask_closing, 5, 255, cv2.THRESH_BINARY_INV)  # mask inv
     mask_inv = cv2.erode(mask_inv, None, iterations=1)
-    mask_inv = cv2.dilate(mask_inv, None, iterations=9)
+    mask_inv = cv2.dilate(mask_inv, None, iterations=10)
 
     # invert mask to focus on objects on table
     ctrs, hierarchy = cv2.findContours(mask_inv, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # find contours
@@ -190,7 +191,7 @@ def is_point_inside_contour(point, contour_rect):
     return x <= point[0] <= x + w and y <= point[1] <= y + h
 
 
-def filter_ctrs(ctrs, min_s=700, max_s=17000, alpha=2):
+def filter_ctrs(ctrs, min_s=700, max_s=18000, alpha=2):
     filtered_ctrs = []  # list for filtered contours
 
     for x in range(len(ctrs)):  # for all contours
@@ -227,12 +228,12 @@ screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 
 hole_pockets = {
-    "LeftTop": (int(screen_width - screen_width), int(screen_height - screen_height + 40)),
-    "MiddleTop": (int((screen_width / 2) - 20), int(screen_height - screen_height)+20),
-    "RightTop": (int(screen_width - 40), int(screen_height - screen_height + 30)),
-    "RightBottom": (int(screen_width - screen_width - 10), int(screen_height-80)),
-    "MiddleBottom": (int((screen_width / 2) - 20), int(screen_height-60)),
-    "LeftBottom": (int(screen_width-30), int(screen_height-80)),
+    "LeftTop": (5, 41),
+    "MiddleTop": (937, 20),
+    "RightTop": (1870, 35),
+    "RightBottom": (1880, 1000),
+    "MiddleBottom": (938, 1020),
+    "LeftBottom": (2, 1000)
 }
 
 # Calculate the center coordinates
